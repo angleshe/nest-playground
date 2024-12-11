@@ -7,12 +7,12 @@ export function Cache(genKey: (...args: unknown[]) => unknown = (key) => key): M
     const cacheMap = safeGetMetadata(CacheKey, new Map<unknown, unknown>(), target, propertyKey);
 
     (descriptor.value as (...args: unknown[]) => unknown) = function (...args: unknown[]) {
-      const key = genKey(args);
+      const key = genKey(...args);
       if (cacheMap.has(key)) {
         return cacheMap.get(key);
       }
 
-      const res = Reflect.apply(originFn, target, args);
+      const res = Reflect.apply(originFn, this, args);
 
       cacheMap.set(key, res);
 

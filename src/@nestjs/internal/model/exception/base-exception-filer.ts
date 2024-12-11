@@ -8,6 +8,7 @@ export class BaseExceptionFilter implements ExceptionFilter {
     return exception instanceof HttpException;
   }
   catch(exception: unknown, host: ArgumentsHost): void {
+    console.error(exception);
     const res = host.switchToHttp().getResponse();
     const context = this.isHttpException(exception)
       ? {

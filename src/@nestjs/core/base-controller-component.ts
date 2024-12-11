@@ -1,4 +1,4 @@
-import { ClassConstructor, ControllerComponentType } from '../internal';
+import { Cache, ClassConstructor, ControllerComponentType } from '../internal';
 import { IController } from './controller';
 
 export abstract class BaseControllerComponent<T extends object> {
@@ -32,16 +32,20 @@ export abstract class BaseControllerComponent<T extends object> {
     return typeof component === 'function';
   }
 
+  @Cache()
+  private buildClass(cls: ClassConstructor<T>, injectable: boolean) {
+    if (injectable) {
+      const module = this.controller.getModule();
+      const classBuilder = module.getClassBuilder();
+
+      return classBuilder.buildClass(cls);
+    }
+    return new cls();
+  }
+
   protected getInstance(component: ControllerComponentType<T>, injectable: boolean = true): T {
     if (this.isClass(component)) {
-      if (injectable) {
-        const module = this.controller.getModule();
-        const classBuilder = module.getClassBuilder();
-
-        return classBuilder.buildClass(component);
-      } else {
-        return new component();
-      }
+      return this.buildClass(component, injectable);
     }
 
     return component;
