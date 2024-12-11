@@ -24,6 +24,7 @@ export interface IModule {
   getControllers(): IController[];
   init(): Promise<void>;
   getClassBuilder(): ClassBuilder;
+  registerGlobalProvider(...providers: Provider[]): void;
 }
 
 export class Module implements IModule {
@@ -48,6 +49,9 @@ export class Module implements IModule {
     this.app = app;
     this.dependenciesManager = DependenciesManager.getInstance<ModuleCls>(moduleCls);
     this.middlewareManager = new MiddlewareManager(app, this.dependenciesManager);
+  }
+  registerGlobalProvider(...providers: Provider[]): void {
+    this.dependenciesManager.registerGlobalProvider(...providers);
   }
   getClassBuilder(): ClassBuilder {
     return this.dependenciesManager;

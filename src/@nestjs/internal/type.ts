@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import type { HTTP_METHODS, RequestMethod } from './constant';
+import { Observable } from 'rxjs';
 
 export interface HttpMethodDescription<
   T extends (...args: unknown[]) => unknown = (...args: unknown[]) => unknown,
@@ -105,3 +106,13 @@ export interface PipeTransform<T = unknown, R = unknown> {
 export type ControllerComponentType<T extends object> = T | ClassConstructor<T>;
 
 export type Pipe = ControllerComponentType<PipeTransform>;
+
+export interface ExecutionContext extends ArgumentsHost {
+  getHandler(): (...args: unknown[]) => unknown;
+}
+
+export interface CanActivate {
+  canActivate(context: ExecutionContext): boolean | Promise<boolean> | Observable<boolean>;
+}
+
+export type Guard = ControllerComponentType<CanActivate>;

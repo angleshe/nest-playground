@@ -16,3 +16,4 @@ export const IS_GLOBAL = Symbol('isGlobal');
 export const CATCH = Symbol('catch');
 export const EXCEPTION_FILTERS = Symbol('exceptionFilters');
 export const PIPES = Symbol('pipes');
+export const GUARDS = Symbol('guards');

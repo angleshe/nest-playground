@@ -21,3 +21,5 @@ export enum HttpStatus {
 export const APP_FILTER = Symbol('appFilter');
 
 export const APP_PIPE = Symbol('appPipe');
+
+export const APP_GUARD = Symbol('appGuard');

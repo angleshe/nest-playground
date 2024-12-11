@@ -1,14 +1,26 @@
 import express, { type Express, type RequestHandler } from 'express';
 import { Logger } from './logger';
-import { type ModuleCls, type ExceptionFilterType, APP_FILTER, Pipe, APP_PIPE } from '../internal';
+import {
+  type ModuleCls,
+  type ExceptionFilterType,
+  APP_FILTER,
+  Pipe,
+  APP_PIPE,
+  Guard,
+  APP_GUARD,
+} from '../internal';
 import session from 'express-session';
 import bodyParser from 'body-parser';
 import { type IModule, Module } from './module';
 import type { GlobalFiltersProvider } from './exception-filter-manager';
 import { ControllerManager, IControllerManager } from './controller-manager';
 import { GlobalPipesProvider } from './pipe-manager';
+import { GlobalGuardProvider } from './guard-manager';
+import { Reflector } from './reflector';
 
-export class NestApplication implements GlobalFiltersProvider, GlobalPipesProvider {
+export class NestApplication
+  implements GlobalFiltersProvider, GlobalPipesProvider, GlobalGuardProvider
+{
   private readonly app: Express;
 
   private readonly logger = new Logger('NestApplication');
@@ -21,10 +33,16 @@ export class NestApplication implements GlobalFiltersProvider, GlobalPipesProvid
 
   private readonly globalPipes: Pipe[] = [];
 
+  private readonly globalGuards: Guard[] = [];
+
   constructor(module: ModuleCls) {
     this.app = express();
     this.root = new Module(this.app, module);
-    this.controllerManager = new ControllerManager(this.app, this, this);
+    this.controllerManager = new ControllerManager(this.app, this, this, this);
+  }
+  getGlobalGuardProvider(): Guard[] {
+    const provideGuard = this.root.getClassBuilder().getDependenceByToken(APP_GUARD);
+    return provideGuard ? this.globalGuards.concat([provideGuard]) : this.globalGuards;
   }
   getGlobalPipes(): Pipe[] {
     const providePipe = this.root.getClassBuilder().getDependenceByToken(APP_PIPE);
@@ -44,6 +62,10 @@ export class NestApplication implements GlobalFiltersProvider, GlobalPipesProvid
     this.globalPipes.push(...pipes);
   }
 
+  useGlobalGuards(...guards: Guard[]): void {
+    this.globalGuards.push(...guards);
+  }
+
   use(...plugins: RequestHandler[]): this {
     this.app.use(...plugins);
     return this;
@@ -60,9 +82,14 @@ export class NestApplication implements GlobalFiltersProvider, GlobalPipesProvid
   }
 
   private async initModule() {
+    this.injectInternalProvider();
     await this.root.init();
     const controllers = this.root.getControllers();
     this.controllerManager.addController(...controllers);
+  }
+
+  private injectInternalProvider() {
+    this.root.registerGlobalProvider(Reflector);
   }
 
   private initPlugin() {

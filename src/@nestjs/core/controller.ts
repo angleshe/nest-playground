@@ -4,6 +4,7 @@ import {
   BaseParamsDecorator,
   CONTROLLER_METHODS,
   ControllerCls,
+  ExecutionContext,
   getMetadata,
   HTTP_CODE,
   HTTP_HEADER,
@@ -25,12 +26,14 @@ import { Logger } from './logger';
 import { IModule } from './module';
 import Path from 'node:path';
 import { IPipeManager } from './pipe-manager';
+import { IGuardManager } from './guard-manager';
 
 export interface IController {
   getModule(): IModule;
   resolveControllers(app: IServer, globalFiltersProvider: GlobalFiltersProvider): void;
   getInstance(): object;
   setPipeManager(pipeManager: IPipeManager): void;
+  setGuardManager(guardManager: IGuardManager): void;
 }
 
 interface RequestHandlerContext {
@@ -40,6 +43,7 @@ interface RequestHandlerContext {
   next: NextFunction;
   methodName: string | symbol;
   method: HTTP_METHODS;
+  handler: (...args: unknown[]) => unknown;
 }
 
 export class Controller implements IController {
@@ -49,12 +53,17 @@ export class Controller implements IController {
 
   private readonly module: IModule;
 
+  private guardManager: IGuardManager | null = null;
+
   private pipeManager: IPipeManager | null = null;
 
   constructor(cls: ControllerCls, module: IModule) {
     this.cls = cls;
     this.module = module;
     this.instance = this.getControllerInstance();
+  }
+  setGuardManager(guardManager: IGuardManager): void {
+    this.guardManager = guardManager;
   }
 
   setPipeManager(pipeManager: IPipeManager): void {
@@ -86,6 +95,15 @@ export class Controller implements IController {
             return res;
           },
         };
+      },
+    };
+  }
+
+  private getExecutionContext(context: RequestHandlerContext): ExecutionContext {
+    return {
+      ...this.getArgumentsHost(context),
+      getHandler() {
+        return context.handler;
       },
     };
   }
@@ -180,8 +198,10 @@ export class Controller implements IController {
             paramDescriptions,
             method,
             methodName,
+            handler: fn,
           };
           try {
+            await this.guardManager?.execGuard(methodName, this.getExecutionContext(context));
             const content = await this.callControllerMethod(fn, context);
             this.resolveResult(content, context);
           } catch (e) {
