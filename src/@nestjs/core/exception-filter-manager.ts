@@ -3,12 +3,14 @@ import {
   BaseExceptionFilter,
   CATCH,
   ClassConstructor,
+  ControllerComponentType,
   EXCEPTION_FILTERS,
   type ExceptionFilter,
   ExceptionFilterType,
   type ExceptionType,
   getMetadata,
 } from '../internal';
+import { BaseControllerComponent } from './base-controller-component';
 import { IController } from './controller';
 export interface IExceptionFilterManager {
   handlerException(exception: unknown, methodName: string | symbol, host: ArgumentsHost): void;
@@ -23,87 +25,60 @@ interface ExceptionFilterObj {
   handler: ExceptionFilter['catch'];
 }
 
-export class ExceptionFilterManager implements IExceptionFilterManager {
+export class ExceptionFilterManager
+  extends BaseControllerComponent<ExceptionFilter>
+  implements IExceptionFilterManager
+{
   private static readonly baseExceptionFiler = new BaseExceptionFilter();
-
-  private readonly controller: IController;
 
   private readonly globalFiltersProvider: GlobalFiltersProvider;
 
   constructor(globalFiltersProvider: GlobalFiltersProvider, controller: IController) {
+    super(controller);
     this.globalFiltersProvider = globalFiltersProvider;
-    this.controller = controller;
   }
 
-  private getMethodFilters(methodName: string | symbol): ExceptionFilterObj[] {
-    const filters =
+  protected override getComponentsFromGlobal(): ControllerComponentType<ExceptionFilter>[] {
+    return this.globalFiltersProvider.getGlobalFilters();
+  }
+  protected override getComponentsFromController(): ControllerComponentType<ExceptionFilter>[] {
+    const controllerInstance = this.controller.getInstance();
+    return (
+      getMetadata<ExceptionFilterType[]>(EXCEPTION_FILTERS, controllerInstance.constructor) ?? []
+    );
+  }
+  protected override getComponentsFromMethod(
+    methodName: string | symbol,
+  ): ControllerComponentType<ExceptionFilter>[] {
+    return (
       getMetadata<ExceptionFilterType[]>(
         EXCEPTION_FILTERS,
         this.controller.getInstance(),
         methodName,
-      ) ?? [];
-    return filters.map((filter) => this.normalizeExceptionFilterObj(filter));
+      ) ?? []
+    );
   }
 
-  private getControllerFilters(): ExceptionFilterObj[] {
-    const controllerInstance = this.controller.getInstance();
-    const filters =
-      getMetadata<ExceptionFilterType[]>(EXCEPTION_FILTERS, controllerInstance.constructor) ?? [];
-    return filters.map((filter) => this.normalizeExceptionFilterObj(filter));
-  }
-
-  private getGlobalFilters(): ExceptionFilterObj[] {
-    const filters = this.globalFiltersProvider.getGlobalFilters();
-    return filters.map((filter) => this.normalizeExceptionFilterObj(filter, false));
-  }
-
-  private getExceptionFilterInstance(exceptionFilter: ExceptionFilterType, injectable: boolean) {
-    let instance: ExceptionFilter;
-    if (typeof exceptionFilter === 'function') {
-      if (injectable) {
-        const module = this.controller.getModule();
-        const classBuilder = module.getClassBuilder();
-        instance = classBuilder.buildClass(exceptionFilter);
-      } else {
-        instance = new exceptionFilter();
-      }
-    } else {
-      instance = exceptionFilter;
-    }
-    return instance;
-  }
-
-  private getFilterTypes(exceptionFilter: ExceptionFilterType): ExceptionType[] {
-    const cls =
-      typeof exceptionFilter === 'function'
-        ? exceptionFilter
-        : (exceptionFilter.constructor as ClassConstructor<ExceptionFilter>);
-
+  private getFilterTypes(exceptionFilter: ExceptionFilter): ExceptionType[] {
+    const cls = exceptionFilter.constructor as ClassConstructor<ExceptionFilter>;
     return getMetadata<ExceptionType[]>(CATCH, cls) ?? [];
   }
 
-  private normalizeExceptionFilterObj(
-    exceptionFilter: ExceptionFilterType,
-    injectable: boolean = true,
-  ): ExceptionFilterObj {
-    const instance = this.getExceptionFilterInstance(exceptionFilter, injectable);
+  private normalizeExceptionFilterObj(instance: ExceptionFilter): ExceptionFilterObj {
     return {
-      filterTypes: this.getFilterTypes(exceptionFilter),
+      filterTypes: this.getFilterTypes(instance),
       handler: instance.catch.bind(instance),
     };
   }
 
   handlerException(exception: unknown, methodName: string | symbol, host: ArgumentsHost): void {
-    const methodFilters = this.getMethodFilters(methodName);
-    const controllerFilters = this.getControllerFilters();
-    const globalFilters = this.getGlobalFilters();
-    const defaultFilters = this.normalizeExceptionFilterObj(
+    const componentInstances: ExceptionFilter[] = [
+      ...this.getComponentInstances(methodName),
       ExceptionFilterManager.baseExceptionFiler,
-      false,
+    ];
+    const filters = componentInstances.map((instance) =>
+      this.normalizeExceptionFilterObj(instance),
     );
-
-    const filters = [...methodFilters, ...controllerFilters, ...globalFilters, defaultFilters];
-
     const { handler } = filters.find((filter) => {
       const { filterTypes } = filter;
       return filterTypes.length === 0 || filterTypes.some((cls) => exception instanceof cls);

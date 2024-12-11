@@ -1,12 +1,13 @@
 import {
   ArgumentMetadata,
-  ClassConstructor,
+  ControllerComponentType,
   getMetadata,
   Pipe,
   PIPES,
   PipesProvider,
   PipeTransform,
 } from '../internal';
+import { BaseControllerComponent } from './base-controller-component';
 import { IController } from './controller';
 
 export interface GlobalPipesProvider {
@@ -21,12 +22,11 @@ export interface IPipeManager {
   ): unknown;
 }
 
-export class PipeManager implements IPipeManager {
-  private readonly controller: IController;
+export class PipeManager extends BaseControllerComponent<PipeTransform> implements IPipeManager {
   private readonly globalPipesProvider: GlobalPipesProvider;
 
   constructor(controller: IController, globalPipesProvider: GlobalPipesProvider) {
-    this.controller = controller;
+    super(controller);
     this.globalPipesProvider = globalPipesProvider;
   }
 
@@ -35,67 +35,52 @@ export class PipeManager implements IPipeManager {
     methodName: string | symbol,
     paramPipesProvider: PipesProvider,
   ): unknown {
-    const globalTransformFns = this.getTransformFromGlobal();
-    const controllerTransformFns = this.getTransformFromController();
-    const methodTransformFns = this.getTransformFromMethod(methodName);
-    const paramTransformFns = this.getTransformFromParams(paramPipesProvider);
+    const paramPipeInstances = this.getPipeInstanceFromParam(paramPipesProvider);
     const metadata = this.getArgumentMetadata(paramPipesProvider);
 
-    const transformFns = [
-      ...globalTransformFns,
-      ...controllerTransformFns,
-      ...methodTransformFns,
-      ...paramTransformFns,
-    ];
+    const transformFns = [...this.getComponentInstances(methodName), ...paramPipeInstances];
 
-    return transformFns.reduce<unknown>((prev, fn) => fn(prev, metadata), value);
+    return transformFns.reduce<unknown>((prev, instance) => {
+      return instance.transform(prev, metadata);
+    }, value);
+  }
+
+  protected override getComponentsFromGlobal(): ControllerComponentType<
+    PipeTransform<unknown, unknown>
+  >[] {
+    return this.globalPipesProvider.getGlobalPipes();
+  }
+  protected override getComponentsFromController(): ControllerComponentType<
+    PipeTransform<unknown, unknown>
+  >[] {
+    const controllerInstance = this.controller.getInstance();
+    return getMetadata<Pipe[]>(PIPES, controllerInstance.constructor) ?? [];
+  }
+  protected override getComponentsFromMethod(
+    methodName: string | symbol,
+  ): ControllerComponentType<PipeTransform<unknown, unknown>>[] {
+    const controllerInstance = this.controller.getInstance();
+    return getMetadata<Pipe[]>(PIPES, controllerInstance, methodName) ?? [];
+  }
+
+  private getPipeInstanceFromParam(paramPipesProvider: PipesProvider) {
+    const pipes = paramPipesProvider.getPipes();
+    return pipes.map((pipe) => this.getInstance(pipe));
+  }
+
+  protected override mergeComponentInstances(
+    globalComponentInstances: PipeTransform<unknown, unknown>[],
+    controllerComponentInstances: PipeTransform<unknown, unknown>[],
+    methodComponentInstances: PipeTransform<unknown, unknown>[],
+  ): PipeTransform<unknown, unknown>[] {
+    return [
+      ...globalComponentInstances,
+      ...controllerComponentInstances,
+      ...methodComponentInstances,
+    ];
   }
 
   private getArgumentMetadata(paramPipesProvider: PipesProvider): ArgumentMetadata {
     return paramPipesProvider.getArgumentMetadata();
-  }
-
-  private getTransformFromParams(paramPipesProvider: PipesProvider): PipeTransform['transform'][] {
-    const pipes = paramPipesProvider.getPipes();
-    return pipes.map((pipe) => this.pipeToTransformFn(pipe));
-  }
-
-  private getTransformFromMethod(methodName: string | symbol): PipeTransform['transform'][] {
-    const controllerInstance = this.controller.getInstance();
-    const pipes = getMetadata<Pipe[]>(PIPES, controllerInstance, methodName) ?? [];
-    return pipes.map((pipe) => this.pipeToTransformFn(pipe));
-  }
-  private getTransformFromController(): PipeTransform['transform'][] {
-    const controllerInstance = this.controller.getInstance();
-    const pipes = getMetadata<Pipe[]>(PIPES, controllerInstance.constructor) ?? [];
-    return pipes.map((pipe) => this.pipeToTransformFn(pipe));
-  }
-
-  private getTransformFromGlobal(): PipeTransform['transform'][] {
-    const pipes = this.globalPipesProvider.getGlobalPipes();
-    return pipes.map((pipe) => this.pipeToTransformFn(pipe, false));
-  }
-
-  private isPipeTransformClass(pipe: Pipe): pipe is ClassConstructor<PipeTransform> {
-    return typeof pipe === 'function';
-  }
-
-  private getPipeInstance(
-    pipeCls: ClassConstructor<PipeTransform>,
-    injectable: boolean,
-  ): PipeTransform {
-    if (injectable) {
-      const module = this.controller.getModule();
-      const classBuilder = module.getClassBuilder();
-      return classBuilder.buildClass(pipeCls);
-    }
-    return new pipeCls();
-  }
-
-  private pipeToTransformFn(pipe: Pipe, injectable: boolean = true): PipeTransform['transform'] {
-    const pipeInstance = this.isPipeTransformClass(pipe)
-      ? this.getPipeInstance(pipe, injectable)
-      : pipe;
-    return pipeInstance.transform.bind(pipeInstance);
   }
 }
