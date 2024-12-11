@@ -1,0 +1,19 @@
+{
+  "compilerOptions": {
+    "experimentalDecorators": true,
+    "emitDecoratorMetadata": true,
+    "target": "ESNext",
+    "moduleResolution": "node",
+    // "module": "NodeNext",
+    "baseUrl": "./",
+    "allowSyntheticDefaultImports": true,
+    "strictNullChecks": true,
+    "strictFunctionTypes": true,
+    "noImplicitOverride": true,
+    "useUnknownInCatchVariables": true,
+    "esModuleInterop": true,
+    "paths": {
+      "@nestjs/*": ["./src/@nestjs/*"]
+    }
+  }
+}

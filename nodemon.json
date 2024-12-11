@@ -1,0 +1,7 @@
+{
+  "$schema": "https://json.schemastore.org/nodemon",
+  "watch": ["src/", "*.json"],
+  "ext": "ts,json,js",
+  "ignore": ["node_modules/*"],
+  "exec": "pnpm run start"
+}
