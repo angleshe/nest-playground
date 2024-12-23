@@ -68,18 +68,6 @@ export class PipeManager extends BaseControllerComponent<PipeTransform> implemen
     return pipes.map((pipe) => this.getInstance(pipe));
   }
 
-  protected override mergeComponentInstances(
-    globalComponentInstances: PipeTransform<unknown, unknown>[],
-    controllerComponentInstances: PipeTransform<unknown, unknown>[],
-    methodComponentInstances: PipeTransform<unknown, unknown>[],
-  ): PipeTransform<unknown, unknown>[] {
-    return [
-      ...globalComponentInstances,
-      ...controllerComponentInstances,
-      ...methodComponentInstances,
-    ];
-  }
-
   private getArgumentMetadata(paramPipesProvider: PipesProvider): ArgumentMetadata {
     return paramPipesProvider.getArgumentMetadata();
   }

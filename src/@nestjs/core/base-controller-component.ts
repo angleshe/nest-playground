@@ -22,9 +22,9 @@ export abstract class BaseControllerComponent<T extends object> {
     methodComponentInstances: T[],
   ): T[] {
     return [
-      ...methodComponentInstances,
-      ...controllerComponentInstances,
       ...globalComponentInstances,
+      ...controllerComponentInstances,
+      ...methodComponentInstances,
     ];
   }
 

@@ -116,3 +116,13 @@ export interface CanActivate {
 }
 
 export type Guard = ControllerComponentType<CanActivate>;
+
+export interface CallHandler {
+  handle<T>(): Observable<T>;
+}
+
+export interface NestInterceptor<T = unknown> {
+  intercept(context: ExecutionContext, next: CallHandler): Observable<T>;
+}
+
+export type Interceptor = ControllerComponentType<NestInterceptor>;

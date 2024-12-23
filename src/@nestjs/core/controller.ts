@@ -27,6 +27,7 @@ import { IModule } from './module';
 import Path from 'node:path';
 import { IPipeManager } from './pipe-manager';
 import { IGuardManager } from './guard-manager';
+import { IInterceptorManager } from './interceptor-manager';
 
 export interface IController {
   getModule(): IModule;
@@ -34,6 +35,7 @@ export interface IController {
   getInstance(): object;
   setPipeManager(pipeManager: IPipeManager): void;
   setGuardManager(guardManager: IGuardManager): void;
+  setInterceptorManager(interceptorManager: IInterceptorManager): void;
 }
 
 interface RequestHandlerContext {
@@ -57,6 +59,8 @@ export class Controller implements IController {
 
   private pipeManager: IPipeManager | null = null;
 
+  private interceptorManager: IInterceptorManager | null = null;
+
   constructor(cls: ControllerCls, module: IModule) {
     this.cls = cls;
     this.module = module;
@@ -68,6 +72,10 @@ export class Controller implements IController {
 
   setPipeManager(pipeManager: IPipeManager): void {
     this.pipeManager = pipeManager;
+  }
+
+  setInterceptorManager(interceptorManager: IInterceptorManager): void {
+    this.interceptorManager = interceptorManager;
   }
 
   getInstance(): object {
@@ -202,8 +210,14 @@ export class Controller implements IController {
           };
           try {
             await this.guardManager?.execGuard(methodName, this.getExecutionContext(context));
-            const content = await this.callControllerMethod(fn, context);
-            this.resolveResult(content, context);
+            await this.interceptorManager?.intercept(
+              methodName,
+              this.getExecutionContext(context),
+              async () => {
+                const content = await this.callControllerMethod(fn, context);
+                this.resolveResult(content, context);
+              },
+            );
           } catch (e) {
             exceptionFilterManager.handlerException(e, methodName, this.getArgumentsHost(context));
           }

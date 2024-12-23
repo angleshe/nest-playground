@@ -8,6 +8,8 @@ import {
   APP_PIPE,
   Guard,
   APP_GUARD,
+  Interceptor,
+  APP_INTERCEPTOR,
 } from '../internal';
 import session from 'express-session';
 import bodyParser from 'body-parser';
@@ -17,9 +19,14 @@ import { ControllerManager, IControllerManager } from './controller-manager';
 import { GlobalPipesProvider } from './pipe-manager';
 import { GlobalGuardProvider } from './guard-manager';
 import { Reflector } from './reflector';
+import { GlobalInterceptorProvider } from './interceptor-manager';
 
 export class NestApplication
-  implements GlobalFiltersProvider, GlobalPipesProvider, GlobalGuardProvider
+  implements
+    GlobalFiltersProvider,
+    GlobalPipesProvider,
+    GlobalGuardProvider,
+    GlobalInterceptorProvider
 {
   private readonly app: Express;
 
@@ -35,10 +42,18 @@ export class NestApplication
 
   private readonly globalGuards: Guard[] = [];
 
+  private readonly globalInterceptors: Interceptor[] = [];
+
   constructor(module: ModuleCls) {
     this.app = express();
     this.root = new Module(this.app, module);
-    this.controllerManager = new ControllerManager(this.app, this, this, this);
+    this.controllerManager = new ControllerManager(this.app, this, this, this, this);
+  }
+  getGlobalInterceptor(): Interceptor[] {
+    const provideInterceptor = this.root.getClassBuilder().getDependenceByToken(APP_INTERCEPTOR);
+    return provideInterceptor
+      ? this.globalInterceptors.concat([provideInterceptor])
+      : this.globalInterceptors;
   }
   getGlobalGuardProvider(): Guard[] {
     const provideGuard = this.root.getClassBuilder().getDependenceByToken(APP_GUARD);
@@ -64,6 +79,10 @@ export class NestApplication
 
   useGlobalGuards(...guards: Guard[]): void {
     this.globalGuards.push(...guards);
+  }
+
+  useGlobalInterceptors(...interceptors: Interceptor[]) {
+    this.globalInterceptors.push(...interceptors);
   }
 
   use(...plugins: RequestHandler[]): this {

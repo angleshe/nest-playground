@@ -17,3 +17,4 @@ export const CATCH = Symbol('catch');
 export const EXCEPTION_FILTERS = Symbol('exceptionFilters');
 export const PIPES = Symbol('pipes');
 export const GUARDS = Symbol('guards');
+export const INTERCEPTOR = Symbol('interceptor');

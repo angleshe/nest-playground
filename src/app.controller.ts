@@ -19,12 +19,14 @@ import {
   Redirect,
   Inject,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
 import type { Request as NestRequest, Response as NestResponse, NextFunction } from 'express';
 import { User } from './user.decorator';
 import { LoggerService } from './logger.service';
 import { AuthGuard } from './auth.guard';
 import { Roles } from './roles.decorator';
+import { LoggingInterceptor, LoggingInterceptor2 } from './logging.interceptor';
 
 declare module 'express-session' {
   interface SessionData {
@@ -159,6 +161,8 @@ export class AppController {
   @Get('role/:role')
   @UseGuards(AuthGuard)
   @Roles(['user'])
+  @UseInterceptors(LoggingInterceptor2)
+  @UseInterceptors(LoggingInterceptor)
   role(@Param('role') role: string) {
     return `role: ${role}`;
   }

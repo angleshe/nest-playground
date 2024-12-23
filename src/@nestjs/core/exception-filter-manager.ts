@@ -59,6 +59,18 @@ export class ExceptionFilterManager
     );
   }
 
+  protected override mergeComponentInstances(
+    globalComponentInstances: ExceptionFilter[],
+    controllerComponentInstances: ExceptionFilter[],
+    methodComponentInstances: ExceptionFilter[],
+  ): ExceptionFilter[] {
+    return [
+      ...methodComponentInstances,
+      ...controllerComponentInstances,
+      ...globalComponentInstances,
+    ];
+  }
+
   private getFilterTypes(exceptionFilter: ExceptionFilter): ExceptionType[] {
     const cls = exceptionFilter.constructor as ClassConstructor<ExceptionFilter>;
     return getMetadata<ExceptionType[]>(CATCH, cls) ?? [];
